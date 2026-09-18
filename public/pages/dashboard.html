@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — PeaceVoice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+  <nav id="navbar"></nav>
+
+  <div style="max-width:1280px;margin:0 auto;padding:2rem 1.5rem">
+    <div id="dashboard-content">
+      <p class="text-muted" style="text-align:center;padding:3rem">Loading dashboard...</p>
+    </div>
+  </div>
+
+  <div id="footer"></div>
+  <script src="/js/api.js"></script>
+  <script>
+    async function loadDashboard() {
+      const user = window._currentUser;
+      if (!user) {
+        window.location.href = '/pages/login.html';
+        return;
+      }
+
+      try {
+        const data = await api.get('/users/me/dashboard');
+        const s = data.stats;
+
+        document.getElementById('dashboard-content').innerHTML = `
+          <!-- Welcome -->
+          <div class="card" style="background:linear-gradient(135deg,var(--primary) 0%,#2563EB 100%);color:white;border:none;margin-bottom:2rem;padding:2rem">
+            <div class="flex items-center gap-4">
+              <div class="avatar avatar-lg" style="background:rgba(255,255,255,0.2)">${getInitials(user.display_name)}</div>
+              <div>
+                <h1 style="font-size:1.5rem;font-weight:700;margin-bottom:0.25rem">Welcome back, ${esc(user.display_name)}!</h1>
+                <p style="opacity:0.8;font-size:0.875rem">Member since ${new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stats grid -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:2rem">
+            <div class="card" style="text-align:center;padding:1.25rem">
+              <div style="font-size:1.5rem;font-weight:700;color:var(--primary)">${s.totalThreads}</div>
+              <div class="text-xs text-muted">Discussions Started</div>
+            </div>
+            <div class="card" style="text-align:center;padding:1.25rem">
+              <div style="font-size:1.5rem;font-weight:700;color:var(--primary)">${s.totalReplies}</div>
+              <div class="text-xs text-muted">Replies Posted</div>
+            </div>
+            <div class="card" style="text-align:center;padding:1.25rem">
+              <div style="font-size:1.5rem;font-weight:700;color:var(--secondary)">${s.totalPetitionsCreated}</div>
+              <div class="text-xs text-muted">Petitions Created</div>
+            </div>
+            <div class="card" style="text-align:center;padding:1.25rem">
+              <div style="font-size:1.5rem;font-weight:700;color:var(--secondary)">${s.totalPetitionsSigned}</div>
+              <div class="text-xs text-muted">Petitions Signed</div>
+            </div>
+            <div class="card" style="text-align:center;padding:1.25rem">
+              <div style="font-size:1.5rem;font-weight:700;color:var(--accent)">${s.totalEventsOrganized}</div>
+              <div class="text-xs text-muted">Events Organized</div>
+            </div>
+            <div class="card" style="text-align:center;padding:1.25rem">
+              <div style="font-size:1.5rem;font-weight:700;color:var(--accent)">${s.totalEventsAttending}</div>
+              <div class="text-xs text-muted">Events Attending</div>
+            </div>
+          </div>
+
+          <!-- Two columns -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem" class="dashboard-grid">
+            <!-- My Discussions -->
+            <div>
+              <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem">My Recent Discussions</h3>
+              ${data.threads.length === 0 ? '<p class="text-sm text-muted">No discussions yet.</p>' :
+                data.threads.map(t => `
+                  <div class="card" style="padding:0.75rem 1rem;margin-bottom:0.5rem">
+                    <a href="/pages/forum-thread.html?id=${t.id}" style="text-decoration:none;color:var(--text);font-weight:500;font-size:0.875rem">${esc(t.title)}</a>
+                    <div class="text-xs text-muted mt-1">${esc(t.category_name)} &bull; ${t.reply_count} replies &bull; ${timeAgo(t.created_at)}</div>
+                  </div>
+                `).join('')}
+              <a href="/pages/forums.html" class="text-sm" style="color:var(--primary);display:block;margin-top:0.5rem">View all forums &rarr;</a>
+            </div>
+
+            <!-- My Petitions -->
+            <div>
+              <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem">Petitions I Created</h3>
+              ${data.petitionsCreated.length === 0 ? '<p class="text-sm text-muted">No petitions created yet.</p>' :
+                data.petitionsCreated.map(p => `
+                  <div class="card" style="padding:0.75rem 1rem;margin-bottom:0.5rem">
+                    <a href="/pages/petition-detail.html?id=${p.id}" style="text-decoration:none;color:var(--text);font-weight:500;font-size:0.875rem">${esc(p.title)}</a>
+                    <div class="text-xs text-muted mt-1">${p.signature_count} signatures &bull; ${p.status}</div>
+                  </div>
+                `).join('')}
+
+              <h3 style="font-size:1rem;font-weight:600;margin:1.5rem 0 0.75rem">Petitions I Signed</h3>
+              ${data.petitionsSigned.length === 0 ? '<p class="text-sm text-muted">No petitions signed yet.</p>' :
+                data.petitionsSigned.map(p => `
+                  <div class="card" style="padding:0.75rem 1rem;margin-bottom:0.5rem">
+                    <a href="/pages/petition-detail.html?id=${p.id}" style="text-decoration:none;color:var(--text);font-weight:500;font-size:0.875rem">${esc(p.title)}</a>
+                    <div class="text-xs text-muted mt-1">Signed ${timeAgo(p.signed_at)}</div>
+                  </div>
+                `).join('')}
+            </div>
+          </div>
+
+          <!-- Edit Profile -->
+          <div class="card" style="margin-top:2rem;padding:1.5rem">
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:1rem">Edit Profile</h3>
+            <form id="profile-form" style="max-width:500px">
+              <div class="form-group">
+                <label>Display Name</label>
+                <input type="text" class="form-input" id="prof-name" value="${esc(user.display_name)}">
+              </div>
+              <div class="form-group">
+                <label>Bio</label>
+                <textarea class="form-input" id="prof-bio" rows="3" placeholder="Tell us about yourself...">${esc(user.bio || '')}</textarea>
+              </div>
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+          </div>
+        `;
+
+        document.getElementById('profile-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          try {
+            await api.put('/users/me', {
+              display_name: document.getElementById('prof-name').value,
+              bio: document.getElementById('prof-bio').value
+            });
+            showToast('Profile updated!');
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        });
+      } catch (err) {
+        document.getElementById('dashboard-content').innerHTML = '<p class="text-muted" style="text-align:center;padding:3rem">Failed to load dashboard. Please log in.</p>';
+        window.location.href = '/pages/login.html';
+      }
+    }
+
+    initPage().then(loadDashboard);
+  </script>
+  <style>
+    @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr !important; } }
+  </style>
+</body>
+</html>

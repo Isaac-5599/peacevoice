@@ -1,0 +1,13 @@
+# Database (rebuilt and reseeded automatically on deploy)
+peacevoice.db
+peacevoice.db-shm
+peacevoice.db-wal
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Archived early prototypes (not part of the app)
+archive/

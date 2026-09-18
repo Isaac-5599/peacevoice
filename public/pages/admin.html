@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel — PeaceVoice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+  <nav id="navbar"></nav>
+
+  <div style="max-width:1280px;margin:0 auto;padding:2rem 1.5rem">
+    <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:1.5rem">Admin Panel</h1>
+
+    <!-- Stats -->
+    <div id="admin-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1rem;margin-bottom:2rem"></div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:0.25rem;margin-bottom:1.5rem;border-bottom:1px solid var(--border);padding-bottom:0">
+      <button class="tab-btn active" onclick="switchTab('users', this)">Users</button>
+      <button class="tab-btn" onclick="switchTab('petitions', this)">Petitions</button>
+      <button class="tab-btn" onclick="switchTab('events', this)">Events</button>
+    </div>
+
+    <div id="tab-content"></div>
+  </div>
+
+  <div id="footer"></div>
+  <script src="/js/api.js"></script>
+  <style>
+    .tab-btn {
+      padding: 0.625rem 1.25rem;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .admin-table { width: 100%; border-collapse: collapse; }
+    .admin-table th { text-align: left; padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    .admin-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+    .admin-table tr:hover { background: #F8FAFC; }
+  </style>
+  <script>
+    let adminData = {};
+
+    async function loadAdmin() {
+      if (!window._currentUser || window._currentUser.role !== 'admin') {
+        document.querySelector('.section').innerHTML = '<p style="text-align:center;padding:3rem;color:var(--text-muted)">Access denied. Admin privileges required.</p>';
+        return;
+      }
+
+      try {
+        const stats = await api.get('/admin/stats');
+        document.getElementById('admin-stats').innerHTML = `
+          <div class="card" style="text-align:center;padding:1rem"><div style="font-size:1.25rem;font-weight:700;color:var(--primary)">${stats.users}</div><div class="text-xs text-muted">Users</div></div>
+          <div class="card" style="text-align:center;padding:1rem"><div style="font-size:1.25rem;font-weight:700;color:var(--primary)">${stats.threads}</div><div class="text-xs text-muted">Threads</div></div>
+          <div class="card" style="text-align:center;padding:1rem"><div style="font-size:1.25rem;font-weight:700;color:var(--primary)">${stats.replies}</div><div class="text-xs text-muted">Replies</div></div>
+          <div class="card" style="text-align:center;padding:1rem"><div style="font-size:1.25rem;font-weight:700;color:var(--secondary)">${stats.petitions}</div><div class="text-xs text-muted">Petitions</div></div>
+          <div class="card" style="text-align:center;padding:1rem"><div style="font-size:1.25rem;font-weight:700;color:var(--secondary)">${stats.signatures}</div><div class="text-xs text-muted">Signatures</div></div>
+          <div class="card" style="text-align:center;padding:1rem"><div style="font-size:1.25rem;font-weight:700;color:var(--accent)">${stats.events}</div><div class="text-xs text-muted">Events</div></div>
+          <div class="card" style="text-align:center;padding:1rem"><div style="font-size:1.25rem;font-weight:700;color:var(--accent)">${stats.resources}</div><div class="text-xs text-muted">Resources</div></div>
+        `;
+
+        switchTab('users', document.querySelector('.tab-btn'));
+      } catch (err) {
+        showToast('Failed to load admin data', 'error');
+      }
+    }
+
+    async function switchTab(tab, el) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+
+      const content = document.getElementById('tab-content');
+
+      if (tab === 'users') {
+        const data = await api.get('/admin/users');
+        content.innerHTML = `
+          <div class="card card-flat" style="overflow-x:auto;padding:0">
+            <table class="admin-table">
+              <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+              <tbody>
+                ${data.users.map(u => `
+                  <tr>
+                    <td><div class="flex items-center gap-2"><span class="avatar" style="background:${esc(u.avatar_color || '#3B82F6')};width:28px;height:28px;font-size:0.65rem">${getInitials(u.display_name)}</span> ${esc(u.display_name)}</div></td>
+                    <td class="text-muted">${esc(u.email)}</td>
+                    <td><span class="badge ${u.role === 'admin' ? 'badge-accent' : 'badge-primary'}">${u.role}</span></td>
+                    <td class="text-xs text-muted">${new Date(u.created_at).toLocaleDateString()}</td>
+                    <td>
+                      ${u.role === 'user'
+                        ? `<button class="btn btn-outline btn-sm" onclick="changeRole(${u.id}, 'admin')">Make Admin</button>`
+                        : `<button class="btn btn-outline btn-sm" onclick="changeRole(${u.id}, 'user')">Make User</button>`
+                      }
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else if (tab === 'petitions') {
+        const data = await api.get('/petitions?limit=50');
+        content.innerHTML = `
+          <div class="card card-flat" style="overflow-x:auto;padding:0">
+            <table class="admin-table">
+              <thead><tr><th>Title</th><th>Author</th><th>Status</th><th>Signatures</th><th>Actions</th></tr></thead>
+              <tbody>
+                ${data.petitions.map(p => `
+                  <tr>
+                    <td><a href="/pages/petition-detail.html?id=${p.id}" style="color:var(--text);text-decoration:none">${esc(p.title)}</a></td>
+                    <td class="text-muted">${esc(p.display_name)}</td>
+                    <td><span class="badge ${p.status === 'open' ? 'badge-secondary' : p.status === 'delivered' ? 'badge-accent' : 'badge-danger'}">${p.status}</span></td>
+                    <td>${p.signature_count}</td>
+                    <td class="flex gap-2">
+                      <select class="form-input" style="width:auto;padding:0.25rem 0.5rem;font-size:0.75rem" onchange="updatePetitionStatus(${p.id}, this.value)">
+                        <option value="open" ${p.status==='open'?'selected':''}>Open</option>
+                        <option value="closed" ${p.status==='closed'?'selected':''}>Closed</option>
+                        <option value="delivered" ${p.status==='delivered'?'selected':''}>Delivered</option>
+                      </select>
+                      <button class="btn btn-danger btn-sm" onclick="deletePetition(${p.id})">Delete</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else if (tab === 'events') {
+        const data = await api.get('/events?limit=50');
+        content.innerHTML = `
+          <div class="card card-flat" style="overflow-x:auto;padding:0">
+            <table class="admin-table">
+              <thead><tr><th>Event</th><th>Organizer</th><th>Type</th><th>Date</th><th>Actions</th></tr></thead>
+              <tbody>
+                ${data.events.map(e => `
+                  <tr>
+                    <td><a href="/pages/event-detail.html?id=${e.id}" style="color:var(--text);text-decoration:none">${esc(e.title)}</a></td>
+                    <td class="text-muted">${esc(e.display_name)}</td>
+                    <td>${e.event_type}</td>
+                    <td class="text-xs text-muted">${new Date(e.event_date).toLocaleDateString()}</td>
+                    <td><button class="btn btn-danger btn-sm" onclick="deleteEvent(${e.id})">Delete</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+
+    async function changeRole(userId, role) {
+      try {
+        await api.put(`/admin/users/${userId}/role`, { role });
+        showToast('Role updated');
+        switchTab('users', document.querySelector('.tab-btn'));
+      } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    async function updatePetitionStatus(id, status) {
+      try {
+        await api.put(`/admin/petitions/${id}/status`, { status });
+        showToast('Status updated');
+      } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    async function deletePetition(id) {
+      if (!confirm('Delete this petition permanently?')) return;
+      try {
+        await api.del(`/admin/petitions/${id}`);
+        showToast('Petition deleted');
+        switchTab('petitions', document.querySelectorAll('.tab-btn')[1]);
+      } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    async function deleteEvent(id) {
+      if (!confirm('Delete this event permanently?')) return;
+      try {
+        await api.del(`/admin/events/${id}`);
+        showToast('Event deleted');
+        switchTab('events', document.querySelectorAll('.tab-btn')[2]);
+      } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    initPage().then(loadAdmin);
+  </script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discussion — PeaceVoice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+  <nav id="navbar"></nav>
+
+  <div style="max-width:860px;margin:0 auto;padding:2rem 1.5rem">
+    <a href="/pages/forums.html" class="text-sm" style="color:var(--primary);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;margin-bottom:1rem">&larr; Back to Forums</a>
+
+    <div id="thread-container"></div>
+
+    <div id="replies-container" style="margin-top:1.5rem"></div>
+
+    <!-- Reply form -->
+    <div id="reply-section" style="margin-top:2rem;display:none">
+      <div class="card">
+        <h3 style="font-size:1rem;font-weight:600;margin-bottom:1rem">Post a Reply</h3>
+        <form id="reply-form">
+          <div class="form-group">
+            <textarea class="form-input" id="reply-content" required placeholder="Share your thoughts..." rows="4"></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end">
+            <button type="submit" class="btn btn-primary">Post Reply</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div id="login-prompt" style="margin-top:2rem;display:none">
+      <div class="card" style="text-align:center;padding:2rem">
+        <p class="text-muted">Log in to join the discussion.</p>
+        <a href="/pages/login.html" class="btn btn-primary" style="margin-top:0.5rem">Log In</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer"></div>
+  <script src="/js/api.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const threadId = params.get('id');
+
+    async function loadThread() {
+      if (!threadId) { window.location.href = '/pages/forums.html'; return; }
+
+      try {
+        const data = await api.get(`/forums/threads/${threadId}`);
+        const t = data.thread;
+
+        document.getElementById('thread-container').innerHTML = `
+          <div class="card">
+            <div class="flex items-center gap-2 mb-4">
+              ${t.is_pinned ? '<span class="badge badge-accent">Pinned</span>' : ''}
+              <span class="badge badge-primary">${esc(t.category_name)}</span>
+              ${t.is_locked ? '<span class="badge badge-danger">Locked</span>' : ''}
+            </div>
+            <h1 style="font-size:1.5rem;font-weight:700;margin-bottom:1rem">${esc(t.title)}</h1>
+            <div class="flex items-center gap-2 mb-4">
+              <span class="avatar" style="background:${esc(t.avatar_color)}">${getInitials(t.display_name)}</span>
+              <div>
+                <div style="font-weight:500;font-size:0.875rem">${esc(t.display_name)}</div>
+                <div class="text-xs text-muted">${timeAgo(t.created_at)}</div>
+              </div>
+            </div>
+            <div style="line-height:1.7;white-space:pre-wrap">${esc(t.content)}</div>
+          </div>
+        `;
+
+        // Replies
+        const repliesContainer = document.getElementById('replies-container');
+        if (data.replies.length === 0) {
+          repliesContainer.innerHTML = '<p class="text-muted text-sm" style="text-align:center;padding:1.5rem">No replies yet. Be the first to respond!</p>';
+        } else {
+          repliesContainer.innerHTML = `<h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem">${data.replies.length} ${data.replies.length === 1 ? 'Reply' : 'Replies'}</h3>` +
+            data.replies.map(r => `
+              <div class="card" style="margin-bottom:0.75rem;padding:1rem 1.25rem">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="avatar" style="background:${esc(r.avatar_color)};width:28px;height:28px;font-size:0.65rem">${getInitials(r.display_name)}</span>
+                  <div>
+                    <span style="font-weight:500;font-size:0.875rem">${esc(r.display_name)}</span>
+                    <span class="text-xs text-muted" style="margin-left:0.5rem">${timeAgo(r.created_at)}</span>
+                  </div>
+                </div>
+                <div style="line-height:1.6;white-space:pre-wrap;font-size:0.9375rem;padding-left:2.5rem">${esc(r.content)}</div>
+              </div>
+            `).join('');
+        }
+
+        // Show reply form or login prompt
+        if (window._currentUser && !t.is_locked) {
+          document.getElementById('reply-section').style.display = 'block';
+        } else if (!window._currentUser) {
+          document.getElementById('login-prompt').style.display = 'block';
+        }
+      } catch (err) {
+        showToast('Failed to load discussion', 'error');
+      }
+    }
+
+    document.getElementById('reply-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api.post(`/forums/threads/${threadId}/replies`, {
+          content: document.getElementById('reply-content').value
+        });
+        showToast('Reply posted!');
+        document.getElementById('reply-content').value = '';
+        loadThread();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+
+    initPage().then(loadThread);
+  </script>
+</body>
+</html>

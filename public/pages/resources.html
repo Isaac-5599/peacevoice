@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resources — PeaceVoice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+  <nav id="navbar"></nav>
+
+  <div style="max-width:1280px;margin:0 auto;padding:2rem 1.5rem">
+    <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:0.5rem">Resource Library</h1>
+    <p class="text-muted" style="margin-bottom:1.5rem">Guides, toolkits, articles, and reports to support your advocacy for peace and justice.</p>
+
+    <div class="flex items-center gap-2 mb-4" style="flex-wrap:wrap">
+      <select class="form-input" id="filter-type" style="width:auto" onchange="loadResources()">
+        <option value="">All Types</option>
+        <option value="article">Articles</option>
+        <option value="guide">Guides</option>
+        <option value="toolkit">Toolkits</option>
+        <option value="report">Reports</option>
+      </select>
+      <select class="form-input" id="filter-category" style="width:auto" onchange="loadResources()">
+        <option value="">All Topics</option>
+        <option value="peace">Peace</option>
+        <option value="justice">Justice</option>
+        <option value="institutions">Institutions</option>
+        <option value="human_rights">Human Rights</option>
+        <option value="governance">Governance</option>
+      </select>
+    </div>
+
+    <div id="resources-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:1.5rem"></div>
+    <div id="resources-empty" class="text-muted" style="text-align:center;padding:3rem;display:none">No resources found.</div>
+
+    <!-- Expanded resource view -->
+    <div id="resource-detail" style="display:none;margin-top:2rem"></div>
+  </div>
+
+  <div id="footer"></div>
+  <script src="/js/api.js"></script>
+  <script>
+    const typeLabels = { article: 'Article', guide: 'Guide', toolkit: 'Toolkit', report: 'Report', video: 'Video' };
+    const typeColors = { article: '#3B82F6', guide: '#8B5CF6', toolkit: '#059669', report: '#F59E0B', video: '#EF4444' };
+    const catLabels = { peace: 'Peace', justice: 'Justice', institutions: 'Institutions', human_rights: 'Human Rights', governance: 'Governance' };
+
+    async function loadResources() {
+      const type = document.getElementById('filter-type').value;
+      const category = document.getElementById('filter-category').value;
+      let url = '/resources?';
+      if (type) url += `type=${type}&`;
+      if (category) url += `category=${category}`;
+
+      const data = await api.get(url);
+      const container = document.getElementById('resources-list');
+      const empty = document.getElementById('resources-empty');
+
+      document.getElementById('resource-detail').style.display = 'none';
+
+      if (data.resources.length === 0) {
+        container.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      container.innerHTML = data.resources.map(r => `
+        <div class="card" style="cursor:pointer" onclick="showResource(${r.id})">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="badge" style="background:${typeColors[r.resource_type] || '#6B7280'}15;color:${typeColors[r.resource_type] || '#6B7280'}">
+              ${typeLabels[r.resource_type] || r.resource_type}
+            </span>
+            <span class="badge badge-primary">${catLabels[r.category] || r.category}</span>
+          </div>
+          <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.5rem;color:var(--text)">${esc(r.title)}</h3>
+          <p class="text-sm text-muted" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:0.75rem">${esc(r.description)}</p>
+          <div class="flex items-center justify-between text-xs text-muted">
+            <span>${esc(r.author_name || 'PeaceVoice')}</span>
+            <span>${timeAgo(r.created_at)}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function showResource(id) {
+      const data = await api.get(`/resources/${id}`);
+      const r = data.resource;
+      const detail = document.getElementById('resource-detail');
+
+      // Simple markdown-like formatting (bold, paragraphs)
+      let content = esc(r.content || r.description);
+      content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      content = content.replace(/\n\n/g, '</p><p style="margin-bottom:1rem">');
+      content = '<p style="margin-bottom:1rem">' + content + '</p>';
+
+      detail.style.display = 'block';
+      detail.innerHTML = `
+        <div class="card" style="padding:2rem">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('resource-detail').style.display='none';window.scrollTo(0,0)" style="margin-bottom:1rem">&larr; Back to Resources</button>
+          <div class="flex items-center gap-2 mb-4">
+            <span class="badge" style="background:${typeColors[r.resource_type] || '#6B7280'}15;color:${typeColors[r.resource_type] || '#6B7280'}">
+              ${typeLabels[r.resource_type] || r.resource_type}
+            </span>
+            <span class="badge badge-primary">${catLabels[r.category] || r.category}</span>
+          </div>
+          <h2 style="font-size:1.5rem;font-weight:700;margin-bottom:0.5rem">${esc(r.title)}</h2>
+          <div class="flex items-center gap-2 text-sm text-muted" style="margin-bottom:1.5rem">
+            <span>By ${esc(r.author_name || 'PeaceVoice')}</span>
+            <span>&bull;</span>
+            <span>${timeAgo(r.created_at)}</span>
+          </div>
+          <div style="line-height:1.8;font-size:0.9375rem">${content}</div>
+        </div>
+      `;
+      detail.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    initPage().then(loadResources);
+  </script>
+</body>
+</html>

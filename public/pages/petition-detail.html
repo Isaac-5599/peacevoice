@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Petition — PeaceVoice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+  <nav id="navbar"></nav>
+
+  <div style="max-width:860px;margin:0 auto;padding:2rem 1.5rem">
+    <a href="/pages/petitions.html" class="text-sm" style="color:var(--primary);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;margin-bottom:1rem">&larr; Back to Petitions</a>
+
+    <div id="petition-container"></div>
+
+    <div id="signers-section" style="margin-top:2rem"></div>
+  </div>
+
+  <div id="footer"></div>
+  <script src="/js/api.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const petitionId = params.get('id');
+
+    async function loadPetition() {
+      if (!petitionId) { window.location.href = '/pages/petitions.html'; return; }
+
+      try {
+        const data = await api.get(`/petitions/${petitionId}`);
+        const p = data.petition;
+        const pct = Math.min(100, Math.round((p.signature_count / p.goal_signatures) * 100));
+
+        document.getElementById('petition-container').innerHTML = `
+          <div class="card">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="badge ${p.status === 'open' ? 'badge-secondary' : p.status === 'delivered' ? 'badge-accent' : 'badge-danger'}">
+                ${p.status.charAt(0).toUpperCase() + p.status.slice(1)}
+              </span>
+              <span class="text-xs text-muted">Started ${timeAgo(p.created_at)}</span>
+            </div>
+            <h1 style="font-size:1.5rem;font-weight:700;margin-bottom:0.5rem">${esc(p.title)}</h1>
+            <p class="text-sm text-muted" style="margin-bottom:1.5rem">
+              To: <strong>${esc(p.target_entity || 'Decision Makers')}</strong> &bull; By ${esc(p.display_name)}
+            </p>
+
+            <div style="background:#F8FAFC;border-radius:0.5rem;padding:1.25rem;margin-bottom:1.5rem">
+              <div class="flex justify-between items-center mb-2">
+                <span style="font-size:1.5rem;font-weight:700;color:var(--secondary)">${p.signature_count}</span>
+                <span class="text-sm text-muted">of ${p.goal_signatures} goal</span>
+              </div>
+              <div class="progress-bar" style="height:12px;margin-bottom:0.5rem"><div class="progress-fill" style="width:${pct}%"></div></div>
+              <div class="text-sm text-muted" style="text-align:right">${pct}% complete</div>
+            </div>
+
+            ${p.status === 'open' ? `
+              <div id="sign-action">
+                ${data.hasSigned
+                  ? `<button class="btn btn-outline btn-lg" style="width:100%;justify-content:center" onclick="toggleSign()">Remove My Signature</button>`
+                  : `<button class="btn btn-secondary btn-lg" style="width:100%;justify-content:center" onclick="toggleSign()">Sign This Petition</button>`
+                }
+              </div>
+            ` : `<p class="text-muted" style="text-align:center">This petition is ${p.status}.</p>`}
+
+            <hr style="border:none;border-top:1px solid var(--border);margin:1.5rem 0">
+
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:1rem">About This Petition</h3>
+            <div style="line-height:1.7;white-space:pre-wrap">${esc(p.description)}</div>
+          </div>
+        `;
+
+        // Recent signers
+        const signersEl = document.getElementById('signers-section');
+        if (data.recentSigners.length > 0) {
+          signersEl.innerHTML = `
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem">Recent Supporters</h3>
+            <div style="display:flex;flex-direction:column;gap:0.5rem">
+              ${data.recentSigners.map(s => `
+                <div class="card" style="padding:0.75rem 1rem;display:flex;align-items:center;gap:0.75rem">
+                  <span class="avatar" style="background:${esc(s.avatar_color)};width:28px;height:28px;font-size:0.65rem">${getInitials(s.display_name)}</span>
+                  <div>
+                    <span style="font-weight:500;font-size:0.875rem">${esc(s.display_name)}</span>
+                    <span class="text-xs text-muted" style="margin-left:0.5rem">signed ${timeAgo(s.created_at)}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+      } catch (err) {
+        showToast('Failed to load petition', 'error');
+      }
+    }
+
+    let currentlySigned = false;
+    async function toggleSign() {
+      if (!window._currentUser) {
+        window.location.href = '/pages/login.html';
+        return;
+      }
+      try {
+        const data = await api.get(`/petitions/${petitionId}`);
+        if (data.hasSigned) {
+          await api.del(`/petitions/${petitionId}/sign`);
+          showToast('Signature removed');
+        } else {
+          await api.post(`/petitions/${petitionId}/sign`);
+          showToast('Petition signed!');
+        }
+        loadPetition();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    initPage().then(loadPetition);
+  </script>
+</body>
+</html>

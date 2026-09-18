@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PeaceVoice — Strengthening Peace, Justice & Institutions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+  <nav id="navbar"></nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>Your Voice for Peace & Justice</h1>
+    <p>Join a growing community of advocates, organizers, and citizens working together to build stronger, fairer, and more accountable institutions.</p>
+    <div class="flex items-center gap-4" style="justify-content:center;flex-wrap:wrap">
+      <a href="/pages/register.html" class="btn btn-lg" style="background:white;color:var(--primary)">Join the Movement</a>
+      <a href="/pages/forums.html" class="btn btn-outline btn-lg" style="border-color:rgba(255,255,255,0.3);color:white">Explore Discussions</a>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-card"><div class="stat-value" id="stat-users">—</div><div class="stat-label">Community Members</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-threads">—</div><div class="stat-label">Discussions</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-petitions">—</div><div class="stat-label">Active Petitions</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-events">—</div><div class="stat-label">Upcoming Events</div></div>
+  </div>
+
+  <!-- Featured Petitions -->
+  <section class="section">
+    <div class="section-title">
+      <span>Featured Petitions</span>
+      <a href="/pages/petitions.html" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    <div id="featured-petitions" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1.5rem"></div>
+  </section>
+
+  <!-- Upcoming Events -->
+  <section class="section">
+    <div class="section-title">
+      <span>Upcoming Events</span>
+      <a href="/pages/events.html" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    <div id="upcoming-events" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1.5rem"></div>
+  </section>
+
+  <!-- Recent Discussions -->
+  <section class="section">
+    <div class="section-title">
+      <span>Recent Discussions</span>
+      <a href="/pages/forums.html" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    <div id="recent-threads" style="display:flex;flex-direction:column;gap:0.75rem"></div>
+  </section>
+
+  <!-- CTA -->
+  <section style="max-width:1280px;margin:3rem auto;padding:0 1.5rem">
+    <div class="card" style="background:linear-gradient(135deg,var(--primary) 0%,#2563EB 100%);color:white;text-align:center;padding:3rem 2rem;border:none">
+      <h2 style="font-size:1.5rem;margin-bottom:0.75rem">Ready to Make a Difference?</h2>
+      <p style="opacity:0.9;max-width:500px;margin:0 auto 1.5rem;line-height:1.6">Create an account to start discussions, sign petitions, organize events, and connect with fellow advocates.</p>
+      <a href="/pages/register.html" class="btn btn-lg" style="background:white;color:var(--primary)">Create Free Account</a>
+    </div>
+  </section>
+
+  <div id="footer"></div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    const eventTypeLabels = { rally: 'Rally', town_hall: 'Town Hall', workshop: 'Workshop', webinar: 'Webinar', other: 'Event' };
+    const eventTypeColors = { rally: '#EF4444', town_hall: '#3B82F6', workshop: '#8B5CF6', webinar: '#059669', other: '#6B7280' };
+
+    async function loadHome() {
+      try {
+        const data = await api.get('/stats');
+
+        // Stats
+        document.getElementById('stat-users').textContent = data.stats.users;
+        document.getElementById('stat-threads').textContent = data.stats.threads;
+        document.getElementById('stat-petitions').textContent = data.stats.petitions;
+        document.getElementById('stat-events').textContent = data.stats.events;
+
+        // Featured petitions
+        const petContainer = document.getElementById('featured-petitions');
+        petContainer.innerHTML = data.featuredPetitions.map(p => {
+          const pct = Math.min(100, Math.round((p.signature_count / p.goal_signatures) * 100));
+          return `
+            <div class="card">
+              <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.5rem">
+                <a href="/pages/petition-detail.html?id=${p.id}" style="color:var(--text);text-decoration:none">${esc(p.title)}</a>
+              </h3>
+              <p class="text-sm text-muted" style="margin-bottom:1rem">Targeting: ${esc(p.target_entity || 'Decision Makers')}</p>
+              <div class="progress-bar" style="margin-bottom:0.5rem"><div class="progress-fill" style="width:${pct}%"></div></div>
+              <div class="flex justify-between text-sm">
+                <span><strong>${p.signature_count}</strong> of ${p.goal_signatures} signatures</span>
+                <span class="text-muted">${pct}%</span>
+              </div>
+            </div>`;
+        }).join('');
+
+        // Upcoming events
+        const evtContainer = document.getElementById('upcoming-events');
+        evtContainer.innerHTML = data.upcomingEvents.map(e => {
+          const d = new Date(e.event_date);
+          const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+          const day = d.getDate();
+          return `
+            <div class="card">
+              <div class="flex gap-4">
+                <div style="text-align:center;min-width:50px">
+                  <div style="font-size:0.75rem;font-weight:600;color:var(--primary)">${month}</div>
+                  <div style="font-size:1.5rem;font-weight:700">${day}</div>
+                </div>
+                <div>
+                  <span class="badge" style="background:${eventTypeColors[e.event_type] || '#6B7280'}20;color:${eventTypeColors[e.event_type] || '#6B7280'};margin-bottom:0.375rem">${eventTypeLabels[e.event_type] || 'Event'}</span>
+                  <h3 style="font-size:1rem;font-weight:600;margin:0.25rem 0">
+                    <a href="/pages/event-detail.html?id=${e.id}" style="color:var(--text);text-decoration:none">${esc(e.title)}</a>
+                  </h3>
+                  <p class="text-sm text-muted">${esc(e.location || 'Virtual Event')}</p>
+                  <p class="text-xs text-muted mt-1">${e.rsvp_count} attending</p>
+                </div>
+              </div>
+            </div>`;
+        }).join('');
+
+        // Recent threads
+        const threadContainer = document.getElementById('recent-threads');
+        threadContainer.innerHTML = data.recentThreads.map(t => `
+          <div class="card" style="padding:1rem 1.5rem">
+            <div class="flex items-center justify-between">
+              <div>
+                <a href="/pages/forum-thread.html?id=${t.id}" style="color:var(--text);text-decoration:none;font-weight:600;font-size:0.9375rem">${esc(t.title)}</a>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="badge badge-primary">${esc(t.category_name)}</span>
+                  <span class="text-xs text-muted">by ${esc(t.display_name)}</span>
+                  <span class="text-xs text-muted">${timeAgo(t.created_at)}</span>
+                </div>
+              </div>
+              <div class="text-sm text-muted">${t.reply_count} ${t.reply_count === 1 ? 'reply' : 'replies'}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error('Failed to load home page data:', err);
+      }
+    }
+
+    initPage().then(loadHome);
+  </script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event — PeaceVoice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+  <nav id="navbar"></nav>
+
+  <div style="max-width:860px;margin:0 auto;padding:2rem 1.5rem">
+    <a href="/pages/events.html" class="text-sm" style="color:var(--primary);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;margin-bottom:1rem">&larr; Back to Events</a>
+
+    <div id="event-container"></div>
+
+    <div id="attendees-section" style="margin-top:2rem"></div>
+  </div>
+
+  <div id="footer"></div>
+  <script src="/js/api.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const eventId = params.get('id');
+    const typeLabels = { rally: 'Rally', town_hall: 'Town Hall', workshop: 'Workshop', webinar: 'Webinar', other: 'Event' };
+    const typeColors = { rally: '#EF4444', town_hall: '#3B82F6', workshop: '#8B5CF6', webinar: '#059669', other: '#6B7280' };
+
+    async function loadEvent() {
+      if (!eventId) { window.location.href = '/pages/events.html'; return; }
+
+      try {
+        const data = await api.get(`/events/${eventId}`);
+        const e = data.event;
+
+        document.getElementById('event-container').innerHTML = `
+          <div class="card">
+            <div class="flex items-center gap-2 mb-4">
+              <span class="badge" style="background:${typeColors[e.event_type] || '#6B7280'}15;color:${typeColors[e.event_type] || '#6B7280'}">
+                ${typeLabels[e.event_type] || 'Event'}
+              </span>
+              ${e.status === 'completed' ? '<span class="badge badge-danger">Past Event</span>' : '<span class="badge badge-secondary">Upcoming</span>'}
+            </div>
+            <h1 style="font-size:1.5rem;font-weight:700;margin-bottom:1rem">${esc(e.title)}</h1>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+              <div style="background:#F8FAFC;padding:1rem;border-radius:0.5rem">
+                <div class="text-xs text-muted" style="margin-bottom:0.25rem">Date & Time</div>
+                <div style="font-weight:500;font-size:0.9375rem">${formatDate(e.event_date)}</div>
+              </div>
+              <div style="background:#F8FAFC;padding:1rem;border-radius:0.5rem">
+                <div class="text-xs text-muted" style="margin-bottom:0.25rem">Location</div>
+                <div style="font-weight:500;font-size:0.9375rem">${e.is_virtual ? 'Virtual Event' : esc(e.location || 'TBA')}</div>
+              </div>
+              <div style="background:#F8FAFC;padding:1rem;border-radius:0.5rem">
+                <div class="text-xs text-muted" style="margin-bottom:0.25rem">Organizer</div>
+                <div style="font-weight:500;font-size:0.9375rem">${esc(e.display_name)}</div>
+              </div>
+              <div style="background:#F8FAFC;padding:1rem;border-radius:0.5rem">
+                <div class="text-xs text-muted" style="margin-bottom:0.25rem">Attendees</div>
+                <div style="font-weight:500;font-size:0.9375rem">${e.rsvp_count} attending</div>
+              </div>
+            </div>
+
+            ${e.status === 'upcoming' ? `
+              <div id="rsvp-action">
+                ${data.hasRsvp
+                  ? `<button class="btn btn-outline btn-lg" style="width:100%;justify-content:center" onclick="toggleRsvp()">Cancel RSVP</button>
+                     <p class="text-xs text-muted" style="text-align:center;margin-top:0.5rem">You are attending this event</p>`
+                  : `<button class="btn btn-primary btn-lg" style="width:100%;justify-content:center" onclick="toggleRsvp()">RSVP — I'll Attend</button>`
+                }
+              </div>
+            ` : ''}
+
+            <hr style="border:none;border-top:1px solid var(--border);margin:1.5rem 0">
+
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:1rem">About This Event</h3>
+            <div style="line-height:1.7;white-space:pre-wrap">${esc(e.description)}</div>
+
+            ${e.is_virtual && e.virtual_link ? `
+              <div style="margin-top:1rem;padding:1rem;background:#EFF6FF;border-radius:0.5rem">
+                <strong>Virtual Link:</strong> <a href="${esc(e.virtual_link)}" target="_blank" style="color:var(--primary)">${esc(e.virtual_link)}</a>
+              </div>
+            ` : ''}
+          </div>
+        `;
+
+        // Attendees
+        const attEl = document.getElementById('attendees-section');
+        if (data.attendees.length > 0) {
+          attEl.innerHTML = `
+            <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem">Who's Attending</h3>
+            <div style="display:flex;flex-direction:column;gap:0.5rem">
+              ${data.attendees.map(a => `
+                <div class="card" style="padding:0.75rem 1rem;display:flex;align-items:center;gap:0.75rem">
+                  <span class="avatar" style="background:${esc(a.avatar_color)};width:28px;height:28px;font-size:0.65rem">${getInitials(a.display_name)}</span>
+                  <div>
+                    <span style="font-weight:500;font-size:0.875rem">${esc(a.display_name)}</span>
+                    <span class="text-xs text-muted" style="margin-left:0.5rem">RSVPed ${timeAgo(a.created_at)}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+      } catch (err) {
+        showToast('Failed to load event', 'error');
+      }
+    }
+
+    async function toggleRsvp() {
+      if (!window._currentUser) {
+        window.location.href = '/pages/login.html';
+        return;
+      }
+      try {
+        const data = await api.get(`/events/${eventId}`);
+        if (data.hasRsvp) {
+          await api.del(`/events/${eventId}/rsvp`);
+          showToast('RSVP cancelled');
+        } else {
+          await api.post(`/events/${eventId}/rsvp`);
+          showToast("You're attending!");
+        }
+        loadEvent();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    initPage().then(loadEvent);
+  </script>
+</body>
+</html>

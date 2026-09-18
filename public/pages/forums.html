@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community Forums — PeaceVoice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+  <nav id="navbar"></nav>
+
+  <div style="max-width:1280px;margin:0 auto;padding:2rem 1.5rem">
+    <div class="flex items-center justify-between mb-4">
+      <h1 style="font-size:1.75rem;font-weight:700">Community Forums</h1>
+      <button class="btn btn-primary" id="new-thread-btn" onclick="showNewThreadModal()">New Discussion</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:2rem" id="forums-layout">
+      <!-- Categories sidebar -->
+      <div>
+        <div class="card card-flat" style="padding:0">
+          <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);font-weight:600;font-size:0.875rem">Categories</div>
+          <div id="categories-list">
+            <div style="padding:0.75rem 1rem;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.875rem;color:var(--primary);font-weight:500;background:#EFF6FF" onclick="selectCategory(null, this)">
+              All Discussions
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Threads list -->
+      <div>
+        <div id="threads-list" style="display:flex;flex-direction:column;gap:0.5rem"></div>
+        <div id="threads-empty" class="text-muted text-sm" style="text-align:center;padding:3rem;display:none">No discussions found in this category.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Thread Modal -->
+  <div id="thread-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal">
+      <h2>Start a New Discussion</h2>
+      <form id="thread-form">
+        <div class="form-group">
+          <label>Category</label>
+          <select class="form-input" id="thread-category" required></select>
+        </div>
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" class="form-input" id="thread-title" required placeholder="What do you want to discuss?">
+        </div>
+        <div class="form-group">
+          <label>Content</label>
+          <textarea class="form-input" id="thread-content" required placeholder="Share your thoughts, questions, or ideas..." rows="5"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('thread-modal').style.display='none'">Cancel</button>
+          <button type="submit" class="btn btn-primary">Post Discussion</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="footer"></div>
+  <script src="/js/api.js"></script>
+  <script>
+    let currentCategory = null;
+
+    async function loadForums() {
+      const catData = await api.get('/forums/categories');
+      const catList = document.getElementById('categories-list');
+      const catSelect = document.getElementById('thread-category');
+
+      catData.categories.forEach(c => {
+        catList.innerHTML += `
+          <div style="padding:0.75rem 1rem;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.875rem;display:flex;justify-content:space-between;align-items:center"
+               onclick="selectCategory(${c.id}, this)">
+            <span>${c.icon} ${esc(c.name)}</span>
+            <span class="text-xs text-muted">${c.thread_count}</span>
+          </div>`;
+        catSelect.innerHTML += `<option value="${c.id}">${c.icon} ${esc(c.name)}</option>`;
+      });
+
+      loadThreads();
+    }
+
+    async function selectCategory(catId, el) {
+      currentCategory = catId;
+      // Update active state
+      document.querySelectorAll('#categories-list > div').forEach(d => {
+        d.style.background = '';
+        d.style.color = 'var(--text)';
+        d.style.fontWeight = '400';
+      });
+      if (el) {
+        el.style.background = '#EFF6FF';
+        el.style.color = 'var(--primary)';
+        el.style.fontWeight = '500';
+      }
+      loadThreads();
+    }
+
+    async function loadThreads() {
+      const url = currentCategory ? `/forums/threads?category_id=${currentCategory}` : '/forums/threads';
+      const data = await api.get(url);
+      const container = document.getElementById('threads-list');
+      const empty = document.getElementById('threads-empty');
+
+      if (data.threads.length === 0) {
+        container.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      container.innerHTML = data.threads.map(t => `
+        <a href="/pages/forum-thread.html?id=${t.id}" style="text-decoration:none">
+          <div class="card" style="padding:1rem 1.25rem;cursor:pointer">
+            <div class="flex items-center justify-between">
+              <div style="flex:1;min-width:0">
+                <div class="flex items-center gap-2" style="margin-bottom:0.25rem">
+                  ${t.is_pinned ? '<span class="badge badge-accent">Pinned</span>' : ''}
+                  <span class="badge badge-primary text-xs">${esc(t.category_name)}</span>
+                </div>
+                <h3 style="font-size:0.9375rem;font-weight:600;color:var(--text);margin:0.25rem 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title)}</h3>
+                <div class="flex items-center gap-2 text-xs text-muted">
+                  <span class="avatar" style="background:${esc(t.avatar_color)};width:20px;height:20px;font-size:0.6rem">${getInitials(t.display_name)}</span>
+                  <span>${esc(t.display_name)}</span>
+                  <span>${timeAgo(t.created_at)}</span>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:1rem">
+                <div style="font-size:1.125rem;font-weight:600;color:var(--primary)">${t.reply_count}</div>
+                <div class="text-xs text-muted">${t.reply_count === 1 ? 'reply' : 'replies'}</div>
+              </div>
+            </div>
+          </div>
+        </a>
+      `).join('');
+    }
+
+    function showNewThreadModal() {
+      if (!window._currentUser) {
+        showToast('Please log in to start a discussion', 'error');
+        window.location.href = '/pages/login.html';
+        return;
+      }
+      document.getElementById('thread-modal').style.display = 'flex';
+    }
+
+    document.getElementById('thread-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const result = await api.post('/forums/threads', {
+          category_id: document.getElementById('thread-category').value,
+          title: document.getElementById('thread-title').value,
+          content: document.getElementById('thread-content').value
+        });
+        showToast('Discussion posted!');
+        document.getElementById('thread-modal').style.display = 'none';
+        window.location.href = `/pages/forum-thread.html?id=${result.thread.id}`;
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+
+    initPage().then(loadForums);
+  </script>
+  <style>
+    @media (max-width: 768px) { #forums-layout { grid-template-columns: 1fr; } }
+  </style>
+</body>
+</html>
