@@ -467,7 +467,7 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       return error_response(res, 'Petition not found', 404) unless petition
       has_signed = false
       if session
-        sig = @db.execute("SELECT id FROM petition_signatures WHERE petition_id=? AND user_id=?", pid, session[:user_id]).first
+        sig = @db.execute("SELECT id FROM petition_signatures WHERE petition_id=? AND user_id=?", [pid, session[:user_id]]).first
         has_signed = !sig.nil?
       end
       signers = @db.execute("SELECT u.display_name,u.avatar_color,ps.created_at FROM petition_signatures ps JOIN users u ON u.id=ps.user_id WHERE ps.petition_id=? ORDER BY ps.created_at DESC LIMIT 20", pid)
@@ -502,7 +502,7 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       return error_response(res, 'Event not found', 404) unless event
       has_rsvp = false
       if session
-        r = @db.execute("SELECT id FROM event_rsvps WHERE event_id=? AND user_id=?", eid, session[:user_id]).first
+        r = @db.execute("SELECT id FROM event_rsvps WHERE event_id=? AND user_id=?", [eid, session[:user_id]]).first
         has_rsvp = !r.nil?
       end
       attendees = @db.execute("SELECT u.display_name,u.avatar_color,r.created_at FROM event_rsvps r JOIN users u ON u.id=r.user_id WHERE r.event_id=? ORDER BY r.created_at ASC", eid)
@@ -617,12 +617,12 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       password = body['password'] || ''
       return error_response(res, 'All fields are required') if [username, email, display_name, password].any?(&:empty?)
       return error_response(res, 'Password must be at least 6 characters') if password.length < 6
-      existing = @db.execute("SELECT id FROM users WHERE username=? OR email=?", username, email).first
+      existing = @db.execute("SELECT id FROM users WHERE username=? OR email=?", [username, email]).first
       return error_response(res, 'Username or email already taken') if existing
       colors = ['#3B82F6','#059669','#F59E0B','#EF4444','#8B5CF6','#EC4899']
       color = colors.sample
       pw = hash_password(password)
-      @db.execute("INSERT INTO users (username,email,password_hash,display_name,avatar_color) VALUES (?,?,?,?,?)", username, email, pw, display_name, color)
+      @db.execute("INSERT INTO users (username,email,password_hash,display_name,avatar_color) VALUES (?,?,?,?,?)", [username, email, pw, display_name, color])
       uid = @db.last_insert_row_id
       sid = create_session(uid, 'user')
       set_session_cookie(res, sid)
@@ -634,7 +634,7 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       username = (body['username'] || '').strip
       password = body['password'] || ''
       return error_response(res, 'Username and password are required') if username.empty? || password.empty?
-      user = row(@db.execute("SELECT * FROM users WHERE username=? OR email=?", username, username))
+      user = row(@db.execute("SELECT * FROM users WHERE username=? OR email=?", [username, username]))
       return error_response(res, 'Invalid credentials', 401) unless user && verify_password(password, user['password_hash'])
       sid = create_session(user['id'], user['role'])
       set_session_cookie(res, sid)
@@ -655,7 +655,7 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       title = (body['title'] || '').strip
       content = (body['content'] || '').strip
       return error_response(res, 'All fields are required') if [cat_id, title, content].any? { |v| v.nil? || v.to_s.empty? }
-      @db.execute("INSERT INTO forum_threads (category_id,user_id,title,content) VALUES (?,?,?,?)", cat_id.to_i, session[:user_id], title, content)
+      @db.execute("INSERT INTO forum_threads (category_id,user_id,title,content) VALUES (?,?,?,?)", [cat_id.to_i, session[:user_id], title, content])
       tid = @db.last_insert_row_id
       thread = row(@db.execute("SELECT * FROM forum_threads WHERE id=?", tid))
       json_response(res, { 'thread' => thread })
@@ -669,7 +669,7 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       thread = row(@db.execute("SELECT id,is_locked FROM forum_threads WHERE id=?", tid))
       return error_response(res, 'Thread not found', 404) unless thread
       return error_response(res, 'Thread is locked', 403) if thread['is_locked'] == 1
-      @db.execute("INSERT INTO forum_replies (thread_id,user_id,content) VALUES (?,?,?)", tid, session[:user_id], content)
+      @db.execute("INSERT INTO forum_replies (thread_id,user_id,content) VALUES (?,?,?)", [tid, session[:user_id], content])
       @db.execute("UPDATE forum_threads SET updated_at=datetime('now') WHERE id=?", tid)
       rid = @db.last_insert_row_id
       reply = row(@db.execute("SELECT r.*,u.display_name,u.avatar_color,u.username FROM forum_replies r JOIN users u ON u.id=r.user_id WHERE r.id=?", rid))
@@ -682,7 +682,7 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       description = (body['description'] || '').strip
       return error_response(res, 'Title and description are required') if title.empty? || description.empty?
       @db.execute("INSERT INTO petitions (user_id,title,description,target_entity,goal_signatures) VALUES (?,?,?,?,?)",
-                  session[:user_id], title, description, body['target_entity'] || '', body['goal_signatures'] || 100)
+                  [session[:user_id], title, description, body['target_entity'] || '', body['goal_signatures'] || 100])
       pid = @db.last_insert_row_id
       petition = row(@db.execute("SELECT * FROM petitions WHERE id=?", pid))
       json_response(res, { 'petition' => petition })
@@ -694,9 +694,9 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       petition = row(@db.execute("SELECT id,status FROM petitions WHERE id=?", pid))
       return error_response(res, 'Petition not found', 404) unless petition
       return error_response(res, 'Petition is no longer open') unless petition['status'] == 'open'
-      existing = @db.execute("SELECT id FROM petition_signatures WHERE petition_id=? AND user_id=?", pid, session[:user_id]).first
+      existing = @db.execute("SELECT id FROM petition_signatures WHERE petition_id=? AND user_id=?", [pid, session[:user_id]]).first
       return error_response(res, 'You have already signed this petition') if existing
-      @db.execute("INSERT INTO petition_signatures (petition_id,user_id) VALUES (?,?)", pid, session[:user_id])
+      @db.execute("INSERT INTO petition_signatures (petition_id,user_id) VALUES (?,?)", [pid, session[:user_id]])
       count = @db.execute("SELECT COUNT(*) as c FROM petition_signatures WHERE petition_id=?", pid).first['c']
       json_response(res, { 'signed' => true, 'signatureCount' => count })
 
@@ -708,10 +708,10 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       event_date = (body['event_date'] || '').strip
       return error_response(res, 'Title, description, and date are required') if [title, description, event_date].any?(&:empty?)
       @db.execute("INSERT INTO events (user_id,title,description,event_type,location,is_virtual,virtual_link,event_date,max_attendees) VALUES (?,?,?,?,?,?,?,?,?)",
-                  session[:user_id], title, description,
+                  [session[:user_id], title, description,
                   body['event_type'] || 'other', body['location'] || '',
                   body['is_virtual'] ? 1 : 0,
-                  body['virtual_link'] || '', event_date, body['max_attendees'] || 0)
+                  body['virtual_link'] || '', event_date, body['max_attendees'] || 0])
       eid = @db.last_insert_row_id
       event = row(@db.execute("SELECT * FROM events WHERE id=?", eid))
       json_response(res, { 'event' => event })
@@ -722,9 +722,9 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       eid = $1.to_i
       event = row(@db.execute("SELECT id FROM events WHERE id=?", eid))
       return error_response(res, 'Event not found', 404) unless event
-      existing = @db.execute("SELECT id FROM event_rsvps WHERE event_id=? AND user_id=?", eid, session[:user_id]).first
+      existing = @db.execute("SELECT id FROM event_rsvps WHERE event_id=? AND user_id=?", [eid, session[:user_id]]).first
       return error_response(res, 'You have already RSVPed') if existing
-      @db.execute("INSERT INTO event_rsvps (event_id,user_id) VALUES (?,?)", eid, session[:user_id])
+      @db.execute("INSERT INTO event_rsvps (event_id,user_id) VALUES (?,?)", [eid, session[:user_id]])
       count = @db.execute("SELECT COUNT(*) as c FROM event_rsvps WHERE event_id=?", eid).first['c']
       json_response(res, { 'rsvped' => true, 'rsvpCount' => count })
 
@@ -747,8 +747,8 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       return error_response(res, 'Authentication required', 401) unless session
       dn = body['display_name']
       bio = body['bio']
-      @db.execute("UPDATE users SET display_name=? WHERE id=?", dn, session[:user_id]) if dn
-      @db.execute("UPDATE users SET bio=? WHERE id=?", bio, session[:user_id]) unless bio.nil?
+      @db.execute("UPDATE users SET display_name=? WHERE id=?", [dn, session[:user_id]]) if dn
+      @db.execute("UPDATE users SET bio=? WHERE id=?", [bio, session[:user_id]]) unless bio.nil?
       user = row(@db.execute("SELECT id,username,email,display_name,bio,avatar_color,role FROM users WHERE id=?", session[:user_id]))
       json_response(res, { 'user' => user })
 
@@ -757,7 +757,7 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       uid = $1.to_i
       role = body['role']
       return error_response(res, 'Invalid role') unless %w[user admin].include?(role)
-      @db.execute("UPDATE users SET role=? WHERE id=?", role, uid)
+      @db.execute("UPDATE users SET role=? WHERE id=?", [role, uid])
       json_response(res, { 'success' => true })
 
     when path =~ %r{^/api/admin/petitions/(\d+)/status$}
@@ -765,7 +765,7 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
       pid = $1.to_i
       status = body['status']
       return error_response(res, 'Invalid status') unless %w[open closed delivered].include?(status)
-      @db.execute("UPDATE petitions SET status=? WHERE id=?", status, pid)
+      @db.execute("UPDATE petitions SET status=? WHERE id=?", [status, pid])
       json_response(res, { 'success' => true })
 
     else
@@ -785,14 +785,14 @@ class PeaceVoiceServlet < WEBrick::HTTPServlet::AbstractServlet
     when path =~ %r{^/api/petitions/(\d+)/sign$}
       return error_response(res, 'Authentication required', 401) unless session
       pid = $1.to_i
-      @db.execute("DELETE FROM petition_signatures WHERE petition_id=? AND user_id=?", pid, session[:user_id])
+      @db.execute("DELETE FROM petition_signatures WHERE petition_id=? AND user_id=?", [pid, session[:user_id]])
       count = @db.execute("SELECT COUNT(*) as c FROM petition_signatures WHERE petition_id=?", pid).first['c']
       json_response(res, { 'signed' => false, 'signatureCount' => count })
 
     when path =~ %r{^/api/events/(\d+)/rsvp$}
       return error_response(res, 'Authentication required', 401) unless session
       eid = $1.to_i
-      @db.execute("DELETE FROM event_rsvps WHERE event_id=? AND user_id=?", eid, session[:user_id])
+      @db.execute("DELETE FROM event_rsvps WHERE event_id=? AND user_id=?", [eid, session[:user_id]])
       count = @db.execute("SELECT COUNT(*) as c FROM event_rsvps WHERE event_id=?", eid).first['c']
       json_response(res, { 'rsvped' => false, 'rsvpCount' => count })
 
