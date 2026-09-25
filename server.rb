@@ -1,6 +1,18 @@
 #!/usr/bin/env ruby
 # PeaceVoice — Community platform for peace, justice, and strong institutions (SDG 16)
 
+# Render's start command runs this file without `bundle exec`, so activate
+# Bundler here; local dev on old Ruby without the bundled gems uses system gems.
+begin
+  require 'bundler/setup'
+rescue LoadError, StandardError
+  ENV.delete('GEM_HOME')
+  ENV.delete('GEM_PATH')
+  ENV.delete('BUNDLE_PATH')
+  Gem.clear_paths
+  Gem::Specification.reset
+end
+
 require 'webrick'
 require 'sqlite3'
 require 'json'
